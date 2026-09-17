@@ -1,0 +1,42 @@
+# ============================================================
+# NLOGA — Digital Ecosystem Platform
+# Files ignored: dev artifacts not used by the live site
+# (only index.html, css/, js/, NLOGA_VISUAL_IDENTITY/ and
+#  the project docs are tracked).
+# ============================================================
+
+# --- Dev / working notes (unreferenced) ---
+_classes.txt
+_selectors.txt
+DESIGN_Code.txt
+ecosystem_modification.txt
+
+# --- Duplicate image previews (~800 KB, copies of NLOGA_VISUAL_IDENTITY) ---
+_preview/
+
+# --- Unused root assets (equivalents live in NLOGA_VISUAL_IDENTITY/) ---
+nloga-favicon.jpg
+nloga-logo.jpg
+nloga-wordmark.jpg
+screen.png
+
+# --- Unreferenced duplicate inside the assets folder ---
+NLOGA_VISUAL_IDENTITY/5854977062785978608_121.jpg
+
+# --- OS metadata ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- Editors / IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Dependencies / logs / secrets (hygiene for any future tooling) ---
+node_modules/
+*.log
+.env
+.env.local
