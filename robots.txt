@@ -1,0 +1,5 @@
+# TODO: replace nloga.com with the real production domain.
+User-agent: *
+Allow: /
+
+Sitemap: https://nloga.com/sitemap.xml

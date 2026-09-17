@@ -222,6 +222,189 @@
     });
   })();
 
+  /* ---------------- 6b. Modal dialog (cases, articles, legal) ---------------- */
+  (function () {
+    var overlay = $('#modal-overlay');
+    var body = $('#modal-body');
+    var closeBtn = $('#modal-close');
+    if (!overlay || !body) return;
+    var lastFocus = null;
+
+    function open(id) {
+      var src = document.getElementById(id);
+      if (!src) return;
+      lastFocus = document.activeElement;
+      body.innerHTML = src.innerHTML;
+      overlay.hidden = false;
+      requestAnimationFrame(function () { requestAnimationFrame(function () {
+        overlay.classList.add('open');
+      }); });
+      document.body.style.overflow = 'hidden';
+      if (closeBtn) closeBtn.focus({ preventScroll: true });
+    }
+    window.openNlogaModal = open;
+
+    function close() {
+      overlay.classList.remove('open');
+      setTimeout(function () {
+        overlay.hidden = true;
+        body.innerHTML = '';
+        document.body.style.overflow = '';
+        if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true });
+      }, 380);
+    }
+    window.closeNlogaModal = close;
+
+    document.addEventListener('click', function (e) {
+      var trigger = e.target.closest ? e.target.closest('[data-modal]') : null;
+      if (trigger) {
+        e.preventDefault();
+        open(trigger.getAttribute('data-modal'));
+        return;
+      }
+      /* In-modal anchor links (e.g. "Start a similar project") close first. */
+      var anchor = e.target.closest ? e.target.closest('.modal-body a[href^="#"]') : null;
+      if (anchor) { close(); return; } /* default anchor navigation proceeds */
+      if (e.target === overlay) close();
+    });
+    if (closeBtn) closeBtn.addEventListener('click', close);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !overlay.hidden) close();
+    });
+  })();
+
+  /* ---------------- 6c. Animated counters ---------------- */
+  (function () {
+    var counters = $$('[data-count]');
+    if (!counters.length) return;
+    var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function render(el, value) {
+      el.textContent = String(Math.round(value)) + (el.getAttribute('data-suffix') || '');
+    }
+    function animate(el) {
+      var target = parseFloat(el.getAttribute('data-count')) || 0;
+      if (reduced || !('requestAnimationFrame' in window)) { render(el, target); return; }
+      var start = null, duration = 1400;
+      function frame(ts) {
+        if (start === null) start = ts;
+        var p = Math.min(1, (ts - start) / duration);
+        var eased = 1 - Math.pow(1 - p, 4);
+        render(el, target * eased);
+        if (p < 1) requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    }
+
+    if (!('IntersectionObserver' in window)) {
+      counters.forEach(animate);
+      return;
+    }
+    var seen = new WeakSet();
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting && !seen.has(entry.target)) {
+          seen.add(entry.target);
+          animate(entry.target);
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.4 });
+    counters.forEach(function (el) { observer.observe(el); });
+  })();
+
+  /* ---------------- 6d. Lightbox gallery ---------------- */
+  (function () {
+    var box = $('#lightbox');
+    if (!box) return;
+    var img = $('#lb-img');
+    var cap = $('#lb-cap');
+    var count = $('#lb-count');
+    var items = $$('.work-media img, .eco-grid .eco-media img, .about-side .eco-media img');
+    if (!items.length || !img) return;
+    var index = 0;
+    var lastFocus = null;
+
+    function render() {
+      var el = items[index];
+      img.classList.remove('zoomed');
+      img.src = el.currentSrc || el.src;
+      img.alt = el.alt || '';
+      if (cap) cap.textContent = el.alt || '';
+      if (count) count.textContent = (index + 1) + ' / ' + items.length;
+    }
+    function open(i) {
+      index = (i + items.length) % items.length;
+      lastFocus = document.activeElement;
+      render();
+      box.hidden = false;
+      requestAnimationFrame(function () { requestAnimationFrame(function () {
+        box.classList.add('open');
+      }); });
+      document.body.style.overflow = 'hidden';
+    }
+    function close() {
+      box.classList.remove('open');
+      setTimeout(function () {
+        box.hidden = true;
+        document.body.style.overflow = '';
+        if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true });
+      }, 380);
+    }
+    window.openNlogaLightbox = open;
+    window.closeNlogaLightbox = close;
+
+    items.forEach(function (el, i) {
+      el.addEventListener('click', function () { open(i); });
+    });
+    img.addEventListener('click', function () { img.classList.toggle('zoomed'); });
+
+    function prev() { index = (index - 1 + items.length) % items.length; render(); }
+    function next() { index = (index + 1) % items.length; render(); }
+    var prevBtn = $('#lb-prev');
+    var nextBtn = $('#lb-next');
+    var closeBtn = $('#lb-close');
+    if (prevBtn) prevBtn.addEventListener('click', prev);
+    if (nextBtn) nextBtn.addEventListener('click', next);
+    if (closeBtn) closeBtn.addEventListener('click', close);
+    box.addEventListener('click', function (e) { if (e.target === box) close(); });
+    document.addEventListener('keydown', function (e) {
+      if (box.hidden) return;
+      if (e.key === 'Escape') close();
+      else if (e.key === 'ArrowLeft') prev();
+      else if (e.key === 'ArrowRight') next();
+    });
+    var touchX = null;
+    box.addEventListener('touchstart', function (e) {
+      touchX = e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientX : null;
+    }, { passive: true });
+    box.addEventListener('touchend', function (e) {
+      if (touchX === null) return;
+      var dx = (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientX : touchX) - touchX;
+      touchX = null;
+      if (Math.abs(dx) < 40) return;
+      if (dx > 0) prev(); else next();
+    }, { passive: true });
+  })();
+
+  /* ---------------- 6e. Card tilt (fine pointers only) ---------------- */
+  (function () {
+    if (!window.matchMedia) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!window.matchMedia('(pointer: fine)').matches) return;
+    $$('.work-card, .eco-card').forEach(function (card) {
+      card.addEventListener('mousemove', function (e) {
+        var r = card.getBoundingClientRect();
+        var px = (e.clientX - r.left) / r.width - 0.5;
+        var py = (e.clientY - r.top) / r.height - 0.5;
+        card.style.transform =
+          'perspective(900px) rotateX(' + (-py * 5).toFixed(2) + 'deg)' +
+          ' rotateY(' + (px * 5).toFixed(2) + 'deg) translateY(-4px)';
+      });
+      card.addEventListener('mouseleave', function () { card.style.transform = ''; });
+    });
+  })();
+
   /* ---------------- 7. FAQ accordion ---------------- */
   (function () {
     var items = $$('.faq-item');
@@ -267,6 +450,57 @@
       var d = el.getAttribute('data-d');
       if (d) el.style.transitionDelay = d + 'ms';
       observer.observe(el);
+    });
+  })();
+
+  /* ---------------- 8b. Ambient scroll parallax ---------------- */
+  (function () {
+    if (!('requestAnimationFrame' in window)) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var layers = $$('.blueprint-layer');
+    var ribbons = $$('.ribbon');
+    var spots = $$('.spotlight');
+    if (!layers.length && !spots.length && !ribbons.length) return;
+    var target = 0, current = 0, running = false;
+    function frame() {
+      /* Ease toward the target for a slow, buttery drift. */
+      current += (target - current) * 0.06;
+      if (Math.abs(target - current) < 0.1) {
+        current = target;
+        running = false;
+      } else {
+        requestAnimationFrame(frame);
+      }
+      layers.forEach(function (l) { l.style.transform = 'translate3d(0,' + (current * -0.05) + 'px,0)'; });
+      ribbons.forEach(function (r) { r.style.transform = 'translate3d(0,' + (current * -0.03) + 'px,0)'; });
+      spots.forEach(function (s) { s.style.transform = 'translate3d(0,' + (current * 0.04) + 'px,0)'; });
+    }
+    window.addEventListener('scroll', function () {
+      target = window.scrollY || window.pageYOffset || 0;
+      if (!running) { running = true; requestAnimationFrame(frame); }
+    }, { passive: true });
+  })();
+
+  /* ---------------- 8c. Scroll progress + back-to-top ---------------- */
+  (function () {
+    var bar = $('#scroll-progress-bar');
+    var topBtn = $('#back-to-top');
+    if (!bar && !topBtn) return;
+    var ticking = false;
+    function update() {
+      ticking = false;
+      var max = document.documentElement.scrollHeight - window.innerHeight;
+      var p = max > 0 ? Math.min(1, (window.scrollY || 0) / max) : 0;
+      if (bar) bar.style.width = (p * 100).toFixed(1) + '%';
+      if (topBtn) topBtn.classList.toggle('visible', (window.scrollY || 0) > 600);
+    }
+    window.addEventListener('scroll', function () {
+      if (!ticking) { ticking = true; requestAnimationFrame(update); }
+    }, { passive: true });
+    update();
+    if (topBtn) topBtn.addEventListener('click', function () {
+      var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
     });
   })();
 
@@ -341,6 +575,32 @@
 
   /* ---------------- 11. Contact form ---------------- */
   (function () {
+    /* TODO: set your real WhatsApp business number (country code + number, no "+"). */
+    /* Optional: paste a Formspree endpoint ID to also receive enquiries by email. */
+    var CONTACT = { whatsapp: '237600000000', formspree: '' };
+    window.NLOGA_CONTACT = CONTACT;
+
+    /* Keep every WhatsApp entry point in sync with the config above. */
+    ['contact-whatsapp', 'fab-whatsapp'].forEach(function (id) {
+      var a = document.getElementById(id);
+      if (a) a.href = 'https://wa.me/' + CONTACT.whatsapp;
+    });
+
+    function isFr() {
+      return (typeof window.NLOGA_isFr === 'function' && window.NLOGA_isFr()) ||
+        (typeof window.NLOGA_getLang === 'function' && window.NLOGA_getLang() === 'fr');
+    }
+    function waLink(name, email, org, need, msg) {
+      var lines = [
+        (isFr() ? 'Bonjour Nloga, je suis ' : 'Hello Nloga, I am ') + name + ' (' + email + ')',
+        (org ? ((isFr() ? 'Organisation : ' : 'Organization: ') + org) : null),
+        (isFr() ? 'Besoin : ' : 'Need: ') + need,
+        '',
+        msg
+      ].filter(function (l) { return l !== null; });
+      return 'https://wa.me/' + CONTACT.whatsapp + '?text=' + encodeURIComponent(lines.join('\n'));
+    }
+
     var form = $('#contact-form');
     if (!form) return;
     var note = $('#form-note');
@@ -348,6 +608,8 @@
       e.preventDefault();
       var name = $('#cf-name');
       var email = $('#cf-email');
+      var org = $('#cf-org');
+      var need = $('#cf-need');
       var msg = $('#cf-msg');
       var ok = true;
       [name, email, msg].forEach(function (f) {
@@ -356,21 +618,45 @@
         f.classList.toggle('field-error', bad);
         if (bad) ok = false;
       });
-      var isFr = (typeof window.NLOGA_isFr === 'function' && window.NLOGA_isFr()) ||
-        (typeof window.NLOGA_getLang === 'function' && window.NLOGA_getLang() === 'fr');
       if (!ok) {
-        if (note) note.textContent = isFr
+        if (note) note.textContent = isFr()
           ? 'Veuillez indiquer votre nom, un e-mail valide et quelques mots sur votre projet.'
           : 'Please complete your name, a valid email, and a short project note.';
-        window.showToast && window.showToast(isFr ? 'Veuillez compléter les champs surlignés' : 'Please complete the highlighted fields');
+        window.showToast && window.showToast(isFr() ? 'Veuillez compléter les champs surlignés' : 'Please complete the highlighted fields');
         return;
       }
-      if (note) note.textContent = isFr
-        ? 'Merci. Nous avons bien reçu votre message et examinerons les détails de votre projet avant de revenir vers vous.'
-        : "Thank you. We've received your message and will review your project details before getting back to you.";
-      window.triggerStudioPulse && window.triggerStudioPulse(isFr ? 'Demande de projet reçue' : 'Project Enquiry Received');
-      window.showToast && window.showToast(isFr ? 'Demande envoyée — merci' : 'Enquiry sent — thank you');
+      var link = waLink(name.value.trim(), email.value.trim(),
+        org && org.value.trim(), need && need.value, msg.value.trim());
+      /* Optional email backend — skipped silently until configured. */
+      if (CONTACT.formspree) {
+        try {
+          fetch('https://formspree.io/f/' + CONTACT.formspree, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({
+              name: name.value.trim(), email: email.value.trim(),
+              organization: org && org.value.trim(), need: need && need.value,
+              message: msg.value.trim()
+            })
+          }).catch(function () {});
+        } catch (err) {}
+      }
+      window.open(link, '_blank', 'noopener');
+      if (note) note.textContent = isFr()
+        ? 'Merci ! WhatsApp s’ouvre avec votre message — envoyez-le pour nous le faire parvenir.'
+        : 'Thank you! WhatsApp is opening with your message — press send to deliver it to us.';
+      window.triggerStudioPulse && window.triggerStudioPulse(isFr() ? 'Demande de projet reçue' : 'Project Enquiry Received');
+      window.showToast && window.showToast(isFr() ? 'Demande envoyée — merci' : 'Enquiry sent — thank you');
       form.reset();
+    });
+  })();
+
+  /* ---------------- 12b. Service worker (PWA offline) ---------------- */
+  (function () {
+    if (!('serviceWorker' in navigator)) return;
+    if (!/^https?:$/.test(window.location.protocol)) return; /* skip on file:// */
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
     });
   })();
 
